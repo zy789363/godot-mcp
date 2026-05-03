@@ -1,246 +1,97 @@
-# Godot MCP
+# Godot MCP MyPro
 
-[![Github-sponsors](https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=#EA4AAA)](https://github.com/sponsors/Coding-Solo)
+一个自研 TypeScript MCP server，用 WebSocket 连接 Godot 编辑器插件，让 AI 助手可以操作 Godot 4 编辑器、场景、节点、脚本、运行时和调试信息。
 
-[![](https://badge.mcpx.dev?type=server 'MCP Server')](https://modelcontextprotocol.io/introduction)
-[![Made with Godot](https://img.shields.io/badge/Made%20with-Godot-478CBF?style=flat&logo=godot%20engine&logoColor=white)](https://godotengine.org)
-[![](https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white 'Node.js')](https://nodejs.org/en/download/)
-[![](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white 'TypeScript')](https://www.typescriptlang.org/)
+本工程迁移了 `godot-mcp-pro` 公开 MIT 仓库里的 Godot 插件代码，但没有使用或还原其未公开的付费 Node.js server。本项目的 server 位于 `src/`，由本仓库自行实现。
 
-[![](https://img.shields.io/github/last-commit/Coding-Solo/godot-mcp 'Last Commit')](https://github.com/Coding-Solo/godot-mcp/commits/main)
-[![](https://img.shields.io/github/stars/Coding-Solo/godot-mcp 'Stars')](https://github.com/Coding-Solo/godot-mcp/stargazers)
-[![](https://img.shields.io/github/forks/Coding-Solo/godot-mcp 'Forks')](https://github.com/Coding-Solo/godot-mcp/network/members)
-[![](https://img.shields.io/badge/License-MIT-red.svg 'MIT License')](https://opensource.org/licenses/MIT)
+快速接入请看：[Godot MCP MyPro 快速上手](docs/QUICKSTART.zh-CN.md)。
 
+## 架构
 
 ```text
-                           (((((((             (((((((
-                        (((((((((((           (((((((((((
-                        (((((((((((((       (((((((((((((
-                        (((((((((((((((((((((((((((((((((
-                        (((((((((((((((((((((((((((((((((
-         (((((      (((((((((((((((((((((((((((((((((((((((((      (((((
-       (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
-     ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
-    ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
-      (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
-        (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
-         (((((((((((@@@@@@@(((((((((((((((((((((((((((@@@@@@@(((((((((((
-         (((((((((@@@@,,,,,@@@(((((((((((((((((((((@@@,,,,,@@@@(((((((((
-         ((((((((@@@,,,,,,,,,@@(((((((@@@@@(((((((@@,,,,,,,,,@@@((((((((
-         ((((((((@@@,,,,,,,,,@@(((((((@@@@@(((((((@@,,,,,,,,,@@@((((((((
-         (((((((((@@@,,,,,,,@@((((((((@@@@@((((((((@@,,,,,,,@@@(((((((((
-         ((((((((((((@@@@@@(((((((((((@@@@@(((((((((((@@@@@@((((((((((((
-         (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
-         (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
-         @@@@@@@@@@@@@((((((((((((@@@@@@@@@@@@@((((((((((((@@@@@@@@@@@@@
-         ((((((((( @@@(((((((((((@@(((((((((((@@(((((((((((@@@ (((((((((
-         (((((((((( @@((((((((((@@@(((((((((((@@@((((((((((@@ ((((((((((
-          (((((((((((@@@@@@@@@@@@@@(((((((((((@@@@@@@@@@@@@@(((((((((((
-           (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
-              (((((((((((((((((((((((((((((((((((((((((((((((((((((
-                 (((((((((((((((((((((((((((((((((((((((((((((((
-                        (((((((((((((((((((((((((((((((((
-
-
-                          /$$      /$$  /$$$$$$  /$$$$$$$
-                         | $$$    /$$$ /$$__  $$| $$__  $$
-                         | $$$$  /$$$$| $$  \__/| $$  \ $$
-                         | $$ $$/$$ $$| $$      | $$$$$$$/
-                         | $$  $$$| $$| $$      | $$____/
-                         | $$\  $ | $$| $$    $$| $$
-                         | $$ \/  | $$|  $$$$$$/| $$
-                         |__/     |__/ \______/ |__/
+AI Assistant ← stdio/MCP → TypeScript Server ← WebSocket:6505 → Godot Editor Plugin
 ```
 
-A Model Context Protocol (MCP) server for interacting with the Godot game engine.
+- `src/index.ts`：MCP server 入口和 CLI 参数处理。
+- `src/pluginClient.ts`：本机 WebSocket bridge，等待 Godot 插件连接。
+- `src/server.ts`：MCP 工具注册、本地 Godot 工具、插件工具分发。
+- `addons/godot_mcp/`：Godot 编辑器插件，公开 MIT 代码迁移而来。
 
-## Introduction
+## 本机基线
 
-Godot MCP enables AI agents to launch the Godot editor, run projects, capture debug output, and control project execution. This direct feedback loop helps agents understand what works and what doesn't in real Godot projects, leading to better code generation and debugging assistance.
+当前工业化测试基线：
 
-## Features
+```text
+/Applications/Godot_mono.app/Contents/MacOS/Godot
+4.6.2.stable.mono.official.71f334935
+```
 
-- **Launch Godot Editor**: Open the Godot editor for a specific project
-- **Run Godot Projects**: Execute Godot projects in debug mode
-- **Capture Debug Output**: Retrieve console output and error messages
-- **Control Execution**: Start and stop Godot projects programmatically
-- **Get Godot Version**: Retrieve the installed Godot version
-- **List Godot Projects**: Find Godot projects in a specified directory
-- **Project Analysis**: Get detailed information about project structure
-- **Scene Management**:
-  - Create new scenes with specified root node types
-  - Add nodes to existing scenes with customizable properties
-  - Load sprites and textures into Sprite2D nodes
-  - Export 3D scenes as MeshLibrary resources for GridMap
-  - Save scenes with options for creating variants
-- **UID Management** (for Godot 4.4+):
-  - Get UID for specific files
-  - Update UID references by resaving resources
+自动检测优先级：
 
-## Requirements
+1. `--godot /path/to/Godot`
+2. `GODOT_PATH`
+3. `/Applications/Godot_mono.app/Contents/MacOS/Godot`
+4. 常见 Godot 安装路径
 
-- [Godot Engine](https://godotengine.org/download) installed on your system
-- Node.js (>=18.0.0) and npm
-- An AI agent that supports MCP
-
-## Quick Start
-
-### Claude Code
+## 安装与运行
 
 ```bash
-claude mcp add godot -- npx @coding-solo/godot-mcp
-```
-
-That's it. Restart Claude Code and your Godot MCP tools are available.
-
-With environment variables:
-
-```bash
-claude mcp add godot -e GODOT_PATH=/path/to/godot -e DEBUG=true -- npx @coding-solo/godot-mcp
-```
-
-<details>
-<summary><strong>Cline</strong></summary>
-
-Add to your Cline MCP settings file (`~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`):
-
-```json
-{
-  "mcpServers": {
-    "godot": {
-      "command": "npx",
-      "args": ["@coding-solo/godot-mcp"],
-      "env": {
-        "DEBUG": "true"
-      },
-      "disabled": false,
-      "autoApprove": [
-        "launch_editor",
-        "run_project",
-        "get_debug_output",
-        "stop_project",
-        "get_godot_version",
-        "list_projects",
-        "get_project_info",
-        "create_scene",
-        "add_node",
-        "load_sprite",
-        "export_mesh_library",
-        "save_scene",
-        "get_uid",
-        "update_project_uids"
-      ]
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>Cursor</strong></summary>
-
-**Using the Cursor UI:**
-
-1. Go to **Cursor Settings** > **Features** > **MCP**
-2. Click on the **+ Add New MCP Server** button
-3. Fill out the form:
-   - Name: `godot`
-   - Type: `command`
-   - Command: `npx @coding-solo/godot-mcp`
-4. Click "Add"
-5. You may need to press the refresh button in the top right corner of the MCP server card to populate the tool list
-
-**Using Project-Specific Configuration:**
-
-Create a file at `.cursor/mcp.json` in your project directory:
-
-```json
-{
-  "mcpServers": {
-    "godot": {
-      "command": "npx",
-      "args": ["@coding-solo/godot-mcp"],
-      "env": {
-        "DEBUG": "true"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>Other MCP Clients</strong></summary>
-
-For any MCP-compatible client, use this configuration:
-
-```json
-{
-  "mcpServers": {
-    "godot": {
-      "command": "npx",
-      "args": ["@coding-solo/godot-mcp"],
-      "env": {
-        "GODOT_PATH": "/path/to/godot",
-        "DEBUG": "true"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-### Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `GODOT_PATH` | Path to the Godot executable (overrides automatic detection) |
-| `DEBUG` | Set to `"true"` to enable detailed server-side debug logging |
-
-<details>
-<summary><strong>Building from Source</strong></summary>
-
-```bash
-git clone https://github.com/Coding-Solo/godot-mcp.git
-cd godot-mcp
-npm install
+npm ci
 npm run build
+node build/index.js --mode lite --port 6505
 ```
 
-Then point your MCP client to `build/index.js` instead of using `npx`.
+安装 Godot 插件到项目：
 
-</details>
+```bash
+node build/index.js --install-addon /path/to/godot-project
+```
 
+然后在 Godot 中启用：
 
-## Architecture
+```text
+Project -> Project Settings -> Plugins -> Godot MCP MyPro -> Enable
+```
 
-The Godot MCP server uses a bundled GDScript approach for complex operations:
+## CLI 参数
 
-1. **Direct Commands**: Simple operations like launching the editor or getting project info use Godot's built-in CLI commands directly.
-2. **Bundled Operations Script**: Complex operations like creating scenes or adding nodes use a single, comprehensive GDScript file (`godot_operations.gd`) that handles all operations.
+```bash
+godot-mcp --mode full|3d|lite|minimal
+godot-mcp --godot /Applications/Godot_mono.app/Contents/MacOS/Godot
+godot-mcp --port 6505
+godot-mcp --install-addon /path/to/godot-project
+```
 
-The bundled script accepts operation type and parameters as JSON, allowing for flexible and dynamic operation execution without generating temporary files for each operation.
+默认 `--mode lite`。`full` 会暴露公开插件中的全量迁移工具；`lite` 先覆盖项目、场景、节点、脚本、编辑器、输入、运行时和 InputMap 核心工作流。
 
-## Troubleshooting
+当前工具模式数量：
 
-- **Godot Not Found**: Set the `GODOT_PATH` environment variable to your Godot executable path
-- **Connection Issues**: Ensure the server is running and restart your AI assistant
-- **Invalid Project Path**: Ensure the path points to a directory containing a `project.godot` file
-- **Build Issues**: Make sure all dependencies are installed by running `npm install`
+| 模式 | 工具数 | 说明 |
+| --- | ---: | --- |
+| `minimal` | 39 | 最小项目/编辑器/运行检查 |
+| `lite` | 95 | 默认日常开发工具集 |
+| `3d` | 120 | `lite` 加 3D、物理、导航、动画树 |
+| `full` | 186 | 全量迁移工具，适合工业化巡检 |
 
-<details>
-<summary><strong>Cursor-Specific Issues</strong></summary>
+## 测试
 
-- Ensure the MCP server shows up and is enabled in Cursor settings (Settings > MCP)
-- MCP tools can only be run using the Agent chat profile (Cursor Pro or Business subscription)
-- Use "Yolo Mode" to automatically run MCP tool requests
+```bash
+npm test
+npm run test:godot
+npm run test:e2e
+npm run test:project -- /path/to/godot-project
+npm run test:p01
+npm run check
+```
 
-</details>
+- `npm test`：工具模式、CLI、Godot 路径检测、server 分发、WebSocket bridge 单元/E2E 测试。
+- `npm run test:godot`：构建后用本机 Godot 4.6.2 Mono 加载临时插件 fixture。
+- `npm run test:project -- /path/to/godot-project`：对指定项目运行 `full` 模式全工具巡检，报告默认写入 `<project>/docs/mcp-mypro/reports/`。
+- `npm run test:p01`：兼容包装命令，默认项目仍是 `/Users/chenhuan/Desktop/AIGame/p01`。
+- `npm run check`：构建、单元测试和 Godot 插件加载检查。
 
-## License
+全工具巡检默认使用 `--safety normal`：删除类工具只用缺失或无效参数做覆盖，脚本执行类工具会显式传 `confirm:true`。MCP 侧可用 `doctor_connection` 检查端口、Godot 版本、活跃项目、插件状态和工具数量；Godot 插件侧可用 `get_mcp_plugin_status` 与 `cleanup_mcp_project_state` 查看并清理 MCP 已知状态。Godot 插件面板的 Tools 页仍支持临时 `Disable All` 或逐项禁用工具。
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## 许可
+
+本项目使用 MIT License。迁入的 Godot 插件代码来源见 `addons/godot_mcp/NOTICE.md`。
