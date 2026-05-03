@@ -61,31 +61,33 @@ node build/index.js --mode full --port 6505 --godot "$GODOT_PATH"
 | `3d` | 在 `lite` 基础上加入 3D 场景、物理、导航等能力 |
 | `full` | 暴露公开插件迁移来的全量工具 |
 
-## 4. 配置 MCP 客户端
+## 4. 配置 Codex MCP 客户端
 
-如果客户端使用 stdio 启动命令，配置为：
+默认以 Codex 为运行环境，在 `~/.codex/config.toml` 中加入：
 
-```json
-{
-  "mcpServers": {
-    "godot-mcp-mypro": {
-      "command": "node",
-      "args": [
-        "/Users/chenhuan/Desktop/AIGame/godot-mcp-mypro/build/index.js",
-        "--mode",
-        "lite",
-        "--port",
-        "6505"
-      ],
-      "env": {
-        "GODOT_PATH": "/Applications/Godot_mono.app/Contents/MacOS/Godot"
-      }
-    }
-  }
-}
+```toml
+[mcp_servers.godot-mcp-mypro]
+command = "node"
+args = [
+  "/Users/chenhuan/Desktop/AIGame/godot-mcp-mypro/build/index.js",
+  "--mode",
+  "lite",
+  "--port",
+  "6505"
+]
+env = { GODOT_PATH = "/Applications/Godot_mono.app/Contents/MacOS/Godot" }
 ```
 
-如果已经全局安装并能找到 `godot-mcp` bin，也可以把 `command` 改成 `godot-mcp`，并移除 `build/index.js` 路径。
+如果已经全局安装并能找到 `godot-mcp` bin，也可以把 `command` 改成 `godot-mcp`，并从 `args` 中移除 `build/index.js` 路径。
+
+项目技能默认放到 Codex skill 目录：
+
+```bash
+mkdir -p ~/.codex/skills/godot-mcp-mypro
+cp addons/godot_mcp/skills.zh.md ~/.codex/skills/godot-mcp-mypro/SKILL.md
+```
+
+其他 MCP 客户端仍可使用等价的 stdio 配置，但本文档默认展示 Codex。
 
 ## 5. 验证接入
 

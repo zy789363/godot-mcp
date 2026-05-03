@@ -6,8 +6,8 @@
     "godot",
     "mcp",
     "ai",
-    "claude",
-    "cline"
+    "codex",
+    "openai"
   ],
   "homepage": "https://github.com/zy789363/godot-mcp",
   "bugs": {

@@ -1,12 +1,17 @@
+---
+name: godot-mcp-mypro
+description: Use when controlling Godot 4 projects through the Godot MCP MyPro server and editor plugin from Codex.
+---
+
 > **Language:** English | [日本語](skills.ja.md) | [Português (BR)](skills.pt-br.md) | [Español](skills.es.md) | [Русский](skills.ru.md) | [简体中文](skills.zh.md) | [हिन्दी](skills.hi.md)
 
-# Godot MCP Pro — Skills for AI Assistants
+# Godot MCP MyPro — Skills for AI Assistants
 
-> Copy this file to `.claude/skills.md` in your Godot project root to give Claude Code full context on how to use Godot MCP Pro effectively.
+> Default Codex setup: copy this file to `.codex/skills/godot-mcp-mypro/SKILL.md` to give Codex full context on how to use Godot MCP MyPro effectively.
 
-## What is Godot MCP Pro?
+## What is Godot MCP MyPro?
 
-You have access to 169 MCP tools that connect directly to the Godot 4 editor. You can create scenes, write scripts, simulate player input, inspect running games, and more — all without the user leaving this conversation. Every change goes through Godot's UndoRedo system, so the user can always Ctrl+Z.
+You have access to 177 MCP tools that connect directly to the Godot 4 editor. You can create scenes, write scripts, simulate player input, inspect running games, and more — all without the user leaving this conversation. Every change goes through Godot's UndoRedo system, so the user can always Ctrl+Z.
 
 ## Essential Workflows
 
