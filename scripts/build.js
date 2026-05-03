@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 // Make the build/index.js file executable
 fs.chmodSync(path.join(__dirname, '..', 'build', 'index.js'), '755');
 
-// Copy the scripts directory to the build directory
+// Copy runtime assets to the build directory
 try {
   // Ensure the build/scripts directory exists
   fs.ensureDirSync(path.join(__dirname, '..', 'build', 'scripts'));
@@ -21,6 +21,14 @@ try {
   );
   
   console.log('Successfully copied godot_operations.gd to build/scripts');
+
+  // Copy the Godot editor addon used by the WebSocket bridge.
+  fs.copySync(
+    path.join(__dirname, '..', 'addons'),
+    path.join(__dirname, '..', 'build', 'addons'),
+    { overwrite: true }
+  );
+  console.log('Successfully copied addons to build/addons');
 } catch (error) {
   console.error('Error copying scripts:', error);
   process.exit(1);
