@@ -64,18 +64,33 @@ godot-mcp --install-addon /path/to/godot-project
 
 默认 `--mode lite`。`full` 会暴露公开插件中的全量迁移工具；`lite` 先覆盖项目、场景、节点、脚本、编辑器、输入、运行时和 InputMap 核心工作流。
 
+当前工具模式数量：
+
+| 模式 | 工具数 | 说明 |
+| --- | ---: | --- |
+| `minimal` | 39 | 最小项目/编辑器/运行检查 |
+| `lite` | 95 | 默认日常开发工具集 |
+| `3d` | 120 | `lite` 加 3D、物理、导航、动画树 |
+| `full` | 186 | 全量迁移工具，适合工业化巡检 |
+
 ## 测试
 
 ```bash
 npm test
 npm run test:godot
 npm run test:e2e
+npm run test:project -- /path/to/godot-project
+npm run test:p01
 npm run check
 ```
 
 - `npm test`：工具模式、CLI、Godot 路径检测、server 分发、WebSocket bridge 单元/E2E 测试。
 - `npm run test:godot`：构建后用本机 Godot 4.6.2 Mono 加载临时插件 fixture。
+- `npm run test:project -- /path/to/godot-project`：对指定项目运行 `full` 模式全工具巡检，报告默认写入 `<project>/docs/mcp-mypro/reports/`。
+- `npm run test:p01`：兼容包装命令，默认项目仍是 `/Users/chenhuan/Desktop/AIGame/p01`。
 - `npm run check`：构建、单元测试和 Godot 插件加载检查。
+
+全工具巡检默认使用 `--safety normal`：删除类工具只用缺失或无效参数做覆盖，脚本执行类工具会显式传 `confirm:true`。MCP 侧可用 `doctor_connection` 检查端口、Godot 版本、活跃项目、插件状态和工具数量；Godot 插件侧可用 `get_mcp_plugin_status` 与 `cleanup_mcp_project_state` 查看并清理 MCP 已知状态。Godot 插件面板的 Tools 页仍支持临时 `Disable All` 或逐项禁用工具。
 
 ## 许可
 

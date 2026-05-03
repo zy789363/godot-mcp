@@ -54,12 +54,14 @@ node build/index.js --mode full --port 6505 --godot "$GODOT_PATH"
 
 可用模式：
 
-| 模式 | 适用场景 |
-| --- | --- |
-| `minimal` | 只保留最小项目/编辑器检查能力 |
-| `lite` | 默认模式，覆盖项目、场景、节点、脚本、编辑器、输入、运行时、InputMap |
-| `3d` | 在 `lite` 基础上加入 3D 场景、物理、导航等能力 |
-| `full` | 暴露公开插件迁移来的全量工具 |
+| 模式 | 工具数 | 适用场景 |
+| --- | ---: | --- |
+| `minimal` | 39 | 只保留最小项目/编辑器检查能力 |
+| `lite` | 95 | 默认模式，覆盖项目、场景、节点、脚本、编辑器、输入、运行时、InputMap |
+| `3d` | 120 | 在 `lite` 基础上加入 3D 场景、物理、导航、动画树等能力 |
+| `full` | 186 | 暴露公开插件迁移来的全量工具，适合全工具巡检 |
+
+当前活跃项目由连接到该端口的 Godot 编辑器决定。多项目并行时，建议每个编辑器和 MCP server 使用不同端口，避免 server 连到非目标项目。
 
 ## 4. 配置 Codex MCP 客户端
 
@@ -116,11 +118,48 @@ npm run test:p01
 /Users/chenhuan/Desktop/AIGame/p01/docs/mcp-mypro/reports/p01_full_tool_report.json
 ```
 
+对任意项目做同样的 `full` 模式巡检：
+
+```bash
+npm run test:project -- /path/to/your-godot-project
+```
+
+也可以用环境变量固定重度测试配置：
+
+```bash
+MCP_TEST_PROJECT=/path/to/your-godot-project \
+MCP_TEST_PORT=6506 \
+MCP_TEST_RUN_ID=nightly_001 \
+MCP_TEST_REPORT_DIR=/path/to/reports \
+npm run test:project
+```
+
+常用参数和环境变量：
+
+| 参数/环境变量 | 作用 |
+| --- | --- |
+| `--project` / `MCP_TEST_PROJECT` / `P01_PROJECT` | 目标 Godot 项目路径；`test:p01` 会默认设置为本机 p01 |
+| `--godot` / `GODOT_PATH` | Godot 可执行文件路径 |
+| `--port` / `MCP_TEST_PORT` | 测试 server 端口，默认 `6506`，避免和日常 `6505` 冲突 |
+| `--run-id` / `MCP_TEST_RUN_ID` | 测试资源目录名的一部分，默认 `run_<timestamp>` |
+| `--report-dir` / `MCP_TEST_REPORT_DIR` | 报告目录，默认 `<project>/docs/mcp-mypro/reports` |
+| `--report` / `MCP_TEST_REPORT_PATH` | 精确报告文件路径，会覆盖报告目录 |
+
+报告内会记录 `activeProject`、端口、运行 id、工具总数、实际调用数、失败项和安全策略。
+
+### 安全模式与清理
+
+全工具巡检默认采用 `--safety normal`：删除类工具只用缺失或无效参数做覆盖，脚本执行类工具会显式传 `confirm:true`，非删除工具会在 `res://mcp_mypro_test/<run-id>` 下创建测试资源。需要清理时，可以在 Godot 项目里删除 `res://mcp_mypro_test/`，或固定 `MCP_TEST_RUN_ID` 后只删除对应目录。
+
+Godot 插件底部面板的 Tools 页支持逐项禁用工具，也支持 `Disable All` / `Enable All`。如果禁用了工具，巡检报告会出现 disabled tool 错误；跑全量巡检前请确认目标工具已启用。
+
+常用排障入口已经注册为 MCP 工具：`doctor_connection` 会覆盖端口、Godot 路径/版本、插件连接、活跃项目、模式工具数等检查；`get_mcp_plugin_status` 会返回插件侧项目路径、端口扫描、autoload 和临时状态；`cleanup_mcp_project_state` 会清理 MCP 插件可识别的 autoload 和临时状态，保留用户资源。
+
 ## 6. 常见问题
 
 ### Godot 插件连不上 server
 
-确认 MCP server 的 `--port` 和 Godot 插件扫描端口一致。默认 server 监听 `6505`，插件会扫描 `6505-6514`。
+确认 MCP server 的 `--port` 和 Godot 插件扫描端口一致。默认 server 监听 `6505`，插件会扫描 `6505-6514`。如果同时打开多个 Godot 项目，请给每个项目分配不同端口，并用报告里的 `activeProject` 确认连接的是目标项目。
 
 ### `tsc: command not found`
 

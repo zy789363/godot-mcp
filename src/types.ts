@@ -2,6 +2,8 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 export type ToolMode = 'minimal' | 'lite' | '3d' | 'full';
 
+export type SafetyMode = 'strict' | 'normal' | 'permissive';
+
 export type ToolCategory =
   | 'local'
   | 'project'
@@ -33,6 +35,7 @@ export type ToolCategory =
 export interface CliOptions {
   mode: ToolMode;
   port: number;
+  safety: SafetyMode;
   godotPath?: string;
   installAddon?: string;
   help: boolean;

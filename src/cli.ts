@@ -1,10 +1,13 @@
-import type { CliOptions } from './types.js';
+import type { CliOptions, SafetyMode } from './types.js';
 import { normalizeMode } from './tools.js';
+
+const SAFETY_VALUES = new Set<SafetyMode>(['strict', 'normal', 'permissive']);
 
 export function parseCliArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     mode: 'lite',
     port: 6505,
+    safety: 'normal',
     help: false,
   };
 
@@ -29,6 +32,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
         options.port = parsePort(next);
         i += 1;
         break;
+      case '--safety':
+        options.safety = normalizeSafety(next);
+        i += 1;
+        break;
       case '--install-addon':
         options.installAddon = next;
         i += 1;
@@ -40,6 +47,8 @@ export function parseCliArgs(argv: string[]): CliOptions {
           options.godotPath = arg.slice('--godot='.length);
         } else if (arg.startsWith('--port=')) {
           options.port = parsePort(arg.slice('--port='.length));
+        } else if (arg.startsWith('--safety=')) {
+          options.safety = normalizeSafety(arg.slice('--safety='.length));
         } else if (arg.startsWith('--install-addon=')) {
           options.installAddon = arg.slice('--install-addon='.length);
         }
@@ -55,11 +64,12 @@ export function helpText(): string {
     'godot-mcp 自研 MCP/WebSocket server',
     '',
     'Usage:',
-    '  godot-mcp [--mode full|3d|lite|minimal] [--port 6505] [--godot /path/to/Godot]',
+    '  godot-mcp [--mode full|3d|lite|minimal] [--safety strict|normal|permissive] [--port 6505] [--godot /path/to/Godot]',
     '  godot-mcp --install-addon /path/to/godot-project',
     '',
     'Options:',
     '  --mode            工具模式，默认 lite',
+    '  --safety          高频/破坏性工具安全模式，默认 normal',
     '  --port            监听 Godot 插件连接的 WebSocket 端口，默认 6505',
     '  --godot           Godot 可执行文件路径，优先于自动检测',
     '  --install-addon   将 addons/godot_mcp 安装到指定 Godot 项目',
@@ -72,4 +82,8 @@ function parsePort(value: string | undefined): number {
     return 6505;
   }
   return port;
+}
+
+function normalizeSafety(value: string | undefined): SafetyMode {
+  return SAFETY_VALUES.has(value as SafetyMode) ? (value as SafetyMode) : 'normal';
 }

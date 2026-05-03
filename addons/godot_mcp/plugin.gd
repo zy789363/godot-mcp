@@ -1,6 +1,8 @@
 @tool
 extends EditorPlugin
 
+const PluginState = preload("res://addons/godot_mcp/utils/plugin_state.gd")
+
 const _MCP_AUTOLOADS: Array[Array] = [
 	["autoload/MCPScreenshot", "res://addons/godot_mcp/mcp_screenshot_service.gd"],
 	["autoload/MCPInputService", "res://addons/godot_mcp/mcp_input_service.gd"],
@@ -8,15 +10,21 @@ const _MCP_AUTOLOADS: Array[Array] = [
 ]
 
 const _MCP_TEMP_FILES: Array[String] = [
+	"mcp_debugger_continue",
 	"mcp_game_request",
 	"mcp_game_response",
 	"mcp_input_commands",
 	"mcp_screenshot_request",
+	"mcp_screenshot.png",
 ]
+const _MCP_STATE_CONFIG_PATH := "user://mcp_plugin_state.cfg"
+const _MCP_BASE_PORT := 6505
+const _MCP_MAX_PORT := 6514
 
 var websocket_server: Node
 var command_router: Node
 var status_panel: Control
+var plugin_state
 var auto_dismiss_dialogs: bool = false
 # Track which autoloads THIS session injected (vs project-owned)
 var _session_injected_autoloads: Array[String] = []
@@ -34,6 +42,9 @@ func _enter_tree() -> void:
 	websocket_server.command_router = command_router
 	add_child(websocket_server)
 
+	plugin_state = PluginState.new()
+	plugin_state.websocket_server = websocket_server
+
 	# Create status panel
 	var panel_scene: PackedScene = preload("res://addons/godot_mcp/ui/status_panel.tscn")
 	status_panel = panel_scene.instantiate()
@@ -41,7 +52,7 @@ func _enter_tree() -> void:
 	status_panel.call_deferred("setup", websocket_server, command_router)
 
 	# Inject MCP autoloads into project settings
-	_inject_autoloads()
+	plugin_state.inject_autoloads()
 
 	websocket_server.start_server()
 	var cfg := ConfigFile.new()
@@ -53,8 +64,9 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	# Remove MCP autoloads and clean up temp files
-	_remove_autoloads()
-	_cleanup_temp_files()
+	if plugin_state:
+		plugin_state.remove_autoloads()
+		plugin_state.cleanup_temp_files()
 
 	if websocket_server:
 		websocket_server.stop_server()
@@ -75,28 +87,99 @@ func _exit_tree() -> void:
 func _inject_autoloads() -> void:
 	_session_injected_autoloads.clear()
 	var changed := false
+	var records := _load_recorded_injected_autoloads()
 	for entry: Array in _MCP_AUTOLOADS:
 		var key: String = entry[0]
 		var script: String = entry[1]
 		if not ProjectSettings.has_setting(key):
 			ProjectSettings.set_setting(key, "*" + script)
 			_session_injected_autoloads.append(key)
+			records[key] = script
 			changed = true
 	if changed:
-		ProjectSettings.save()
+		var err := ProjectSettings.save()
+		if err != OK:
+			push_warning("[MCP] Failed to save injected autoloads: %s" % error_string(err))
+		_save_recorded_injected_autoloads(records)
 
 
 func _remove_autoloads() -> void:
 	# Only remove autoloads that THIS session injected.
 	# Pre-existing project-owned autoloads are preserved.
 	var changed := false
+	var records := _load_recorded_injected_autoloads()
 	for key: String in _session_injected_autoloads:
 		if ProjectSettings.has_setting(key):
-			ProjectSettings.set_setting(key, null)
-			changed = true
+			var expected_path := _expected_autoload_path(key)
+			if _normalize_autoload_value(ProjectSettings.get_setting(key)) == expected_path:
+				ProjectSettings.clear(key)
+				records.erase(key)
+				changed = true
+			else:
+				records.erase(key)
 	_session_injected_autoloads.clear()
 	if changed:
-		ProjectSettings.save()
+		var err := ProjectSettings.save()
+		if err != OK:
+			push_warning("[MCP] Failed to remove injected autoloads: %s" % error_string(err))
+	_save_recorded_injected_autoloads(records)
+
+
+func get_mcp_plugin_status() -> Dictionary:
+	return _get_plugin_state().get_status()
+
+
+func cleanup_mcp_project_state() -> Dictionary:
+	return _get_plugin_state().cleanup_project_state()
+
+
+func _get_plugin_state():
+	if not plugin_state:
+		plugin_state = PluginState.new()
+	plugin_state.websocket_server = websocket_server
+	return plugin_state
+
+
+func _load_recorded_injected_autoloads() -> Dictionary:
+	var records := {}
+	var cfg := ConfigFile.new()
+	if cfg.load(_MCP_STATE_CONFIG_PATH) != OK:
+		return records
+	if not cfg.has_section("injected_autoloads"):
+		return records
+	for key: String in cfg.get_section_keys("injected_autoloads"):
+		records[key] = str(cfg.get_value("injected_autoloads", key, ""))
+	return records
+
+
+func _save_recorded_injected_autoloads(records: Dictionary) -> void:
+	var cfg := ConfigFile.new()
+	for key: String in records:
+		cfg.set_value("injected_autoloads", key, records[key])
+	cfg.set_value("metadata", "updated_at", Time.get_datetime_string_from_system())
+	var err := cfg.save(_MCP_STATE_CONFIG_PATH)
+	if err != OK:
+		push_warning("[MCP] Failed to save MCP plugin state: %s" % error_string(err))
+
+
+func _autoload_name_from_key(key: String) -> String:
+	if key.begins_with("autoload/"):
+		return key.substr("autoload/".length())
+	return key
+
+
+func _expected_autoload_path(key: String) -> String:
+	for entry: Array in _MCP_AUTOLOADS:
+		if entry[0] == key:
+			return entry[1]
+	return ""
+
+
+func _normalize_autoload_value(value: Variant) -> String:
+	var text := str(value)
+	if text.begins_with("*"):
+		return text.substr(1)
+	return text
 
 
 var _dialog_check_timer: float = 0.0
@@ -171,13 +254,65 @@ func _find_and_dismiss_dialogs(node: Node) -> void:
 		_find_and_dismiss_dialogs(child)
 
 
-func _cleanup_temp_files() -> void:
-	var user_dir := OS.get_user_data_dir()
-	for filename: String in _MCP_TEMP_FILES:
-		var path := user_dir + "/" + filename
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(path)
-	# Also clean up screenshot image
-	var screenshot_path := user_dir + "/mcp_screenshot.png"
-	if FileAccess.file_exists(screenshot_path):
-		DirAccess.remove_absolute(screenshot_path)
+func _cleanup_temp_files() -> Dictionary:
+	var removed: Array = []
+	var skipped: Array = []
+	var dirs := _get_runtime_user_dirs()
+
+	for user_dir: String in dirs:
+		for filename: String in _MCP_TEMP_FILES:
+			var path := user_dir.path_join(filename)
+			if not FileAccess.file_exists(path):
+				continue
+			var err := DirAccess.remove_absolute(path)
+			if err == OK:
+				removed.append({
+					"name": filename,
+					"path": path,
+					"directory": user_dir,
+				})
+			else:
+				skipped.append({
+					"name": filename,
+					"path": path,
+					"directory": user_dir,
+					"error": error_string(err),
+				})
+
+	return {
+		"removed": removed,
+		"skipped": skipped,
+		"directories": dirs,
+	}
+
+
+func _get_runtime_user_dirs() -> Array[String]:
+	var dirs: Array[String] = []
+	_append_unique_path(dirs, OS.get_user_data_dir())
+	_append_unique_path(dirs, _get_game_user_dir())
+	return dirs
+
+
+func _append_unique_path(paths: Array[String], path: String) -> void:
+	if path.is_empty():
+		return
+	if not (path in paths):
+		paths.append(path)
+
+
+func _get_game_user_dir() -> String:
+	var cached_dir := OS.get_user_data_dir()
+	var cfg := ConfigFile.new()
+	var err := cfg.load(ProjectSettings.globalize_path("res://project.godot"))
+	if err != OK:
+		return cached_dir
+	if cfg.get_value("application", "config/use_custom_user_dir", false):
+		return cached_dir
+	var disk_name = cfg.get_value("application", "config/name", "")
+	if typeof(disk_name) != TYPE_STRING or (disk_name as String).is_empty():
+		return cached_dir
+	var sanitized := (disk_name as String).xml_unescape().validate_filename().replace(".", "_")
+	if sanitized.is_empty():
+		return cached_dir
+	var base_dir := cached_dir.get_base_dir()
+	return base_dir.path_join(sanitized)

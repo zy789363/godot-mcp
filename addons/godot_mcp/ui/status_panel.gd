@@ -9,21 +9,51 @@ const COLOR_CONNECTED := Color(0.2, 0.9, 0.2)
 const COLOR_DISCONNECTED := Color(0.9, 0.2, 0.2)
 const COLOR_SUCCESS := Color(0.6, 1, 0.6)
 const COLOR_ERROR := Color(1, 0.6, 0.6)
+const COLOR_WARNING := Color(1.0, 0.82, 0.28)
 const COLOR_DIM := Color(0.6, 0.6, 0.6)
 
 const BASE_PORT := 6505
-const MAX_PORT := 6509
+const MAX_PORT := 6514
+
+const _DESTRUCTIVE_COMMANDS := {
+	"cleanup_mcp_project_state": true,
+	"delete_node": true,
+	"delete_scene": true,
+	"remove_animation": true,
+	"remove_autoload": true,
+	"remove_state_machine_state": true,
+	"remove_state_machine_transition": true,
+}
+const _WRITE_COMMANDS := {
+	"attach_script": true,
+	"connect_signal": true,
+	"duplicate_node": true,
+	"edit_script": true,
+	"move_node": true,
+	"rename_node": true,
+	"save_scene": true,
+	"set_project_setting": true,
+}
+const _WRITE_PREFIXES := [
+	"add_",
+	"create_",
+	"set_",
+	"update_",
+]
 
 # Header
 var _status_icon: Label
 var _status_label: Label
 var _client_count_label: Label
+var _connected_ports_label: Label
+var _project_path_label: Label
 
 # Tabs
 var _tab_container: TabContainer
 
 # Activity tab
 var _show_details_check: CheckBox
+var _cleanup_button: Button
 var _log_container: VBoxContainer
 var _log_scroll: ScrollContainer
 
@@ -78,6 +108,24 @@ func _build_ui() -> void:
 	_client_count_label.text = "Clients: 0"
 	header.add_child(_client_count_label)
 
+	_connected_ports_label = Label.new()
+	_connected_ports_label.text = "  Ports: -"
+	header.add_child(_connected_ports_label)
+
+	var project_row := HBoxContainer.new()
+	add_child(project_row)
+
+	var project_title := Label.new()
+	project_title.text = "Project:"
+	project_row.add_child(project_title)
+
+	_project_path_label = Label.new()
+	_project_path_label.text = " " + ProjectSettings.globalize_path("res://")
+	_project_path_label.tooltip_text = ProjectSettings.globalize_path("res://")
+	_project_path_label.clip_text = true
+	_project_path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	project_row.add_child(_project_path_label)
+
 	# Separator
 	var sep := HSeparator.new()
 	add_child(sep)
@@ -111,6 +159,12 @@ func _build_activity_tab() -> void:
 	var ctrl_spacer := Control.new()
 	ctrl_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	controls.add_child(ctrl_spacer)
+
+	_cleanup_button = Button.new()
+	_cleanup_button.text = "Cleanup"
+	_cleanup_button.tooltip_text = "Remove MCP runtime autoloads and temp files"
+	_cleanup_button.pressed.connect(_on_cleanup_pressed)
+	controls.add_child(_cleanup_button)
 
 	var clear_btn := Button.new()
 	clear_btn.text = "Clear"
@@ -214,6 +268,8 @@ func _process(_delta: float) -> void:
 
 	var count: int = websocket_server.get_client_count()
 	_client_count_label.text = "Clients: %d" % count
+	var connected_ports := _get_connected_ports()
+	_connected_ports_label.text = "  Ports: %s" % _format_ports(connected_ports)
 
 	if count > 0:
 		_status_icon.add_theme_color_override("font_color", COLOR_CONNECTED)
@@ -223,14 +279,31 @@ func _process(_delta: float) -> void:
 		_status_label.text = " MCP MyPro: Waiting for connection..."
 
 	# Update clients tab
-	_update_clients_tab()
+	_update_clients_tab(connected_ports)
 
 
-func _update_clients_tab() -> void:
-	var connected_ports: Array[int] = []
+func _get_connected_ports() -> Array[int]:
+	var ports: Array[int] = []
 	if websocket_server.has_method("get_connected_ports"):
-		connected_ports = websocket_server.get_connected_ports()
+		var raw_ports: Array = websocket_server.get_connected_ports()
+		for port in raw_ports:
+			ports.append(int(port))
+	ports.sort()
+	return ports
 
+
+func _format_ports(ports: Array[int]) -> String:
+	if ports.is_empty():
+		return "-"
+	var text := ""
+	for i in range(ports.size()):
+		if i > 0:
+			text += ", "
+		text += str(ports[i])
+	return text
+
+
+func _update_clients_tab(connected_ports: Array[int]) -> void:
 	for p: int in _port_labels:
 		var info: Dictionary = _port_labels[p]
 		var icon: Label = info["icon"]
@@ -264,20 +337,71 @@ func _on_client_disconnected() -> void:
 
 
 func _on_command_executed(method: String, ok: bool) -> void:
-	var color := COLOR_SUCCESS if ok else COLOR_ERROR
+	var style := _classify_command(method)
+	var color := COLOR_SUCCESS
+	if style.has("color"):
+		color = style["color"]
+	if not ok:
+		color = COLOR_ERROR
 	var status_icon := "OK" if ok else "ERR"
-	_add_log("[%s] %s" % [status_icon, method], color)
+	_add_log("[%s] %s%s" % [status_icon, str(style.get("prefix", "")), method], color)
 
 
 func _on_command_completed(method: String, ok: bool, response: String, source_port: int) -> void:
-	var color := COLOR_SUCCESS if ok else COLOR_ERROR
+	var style := _classify_command(method)
+	var color := COLOR_SUCCESS
+	if style.has("color"):
+		color = style["color"]
+	if not ok:
+		color = COLOR_ERROR
 	var status_icon := "OK" if ok else "ERR"
-	_add_log("[%s] %s (port %d)" % [status_icon, method, source_port], color, response)
+	_add_log("[%s] %s%s (port %d)" % [status_icon, str(style.get("prefix", "")), method, source_port], color, response)
+
+
+func _classify_command(method: String) -> Dictionary:
+	if _DESTRUCTIVE_COMMANDS.has(method) or method.begins_with("delete_") or method.begins_with("remove_"):
+		return {"prefix": "[DESTRUCTIVE] ", "color": COLOR_WARNING}
+	if _WRITE_COMMANDS.has(method):
+		return {"prefix": "[WRITE] ", "color": COLOR_WARNING}
+	for prefix: String in _WRITE_PREFIXES:
+		if method.begins_with(prefix):
+			return {"prefix": "[WRITE] ", "color": COLOR_WARNING}
+	return {"prefix": "", "color": COLOR_SUCCESS}
 
 
 func _on_clear_log() -> void:
 	for child in _log_container.get_children():
 		child.queue_free()
+
+
+func _on_cleanup_pressed() -> void:
+	if not command_router:
+		_add_log("[ERR] cleanup_mcp_project_state unavailable", COLOR_ERROR)
+		return
+
+	_cleanup_button.disabled = true
+	_add_log("[RUN] [DESTRUCTIVE] cleanup_mcp_project_state", COLOR_WARNING)
+	var result: Dictionary = await command_router.execute("cleanup_mcp_project_state", {})
+	_cleanup_button.disabled = false
+
+	if result.has("error"):
+		_add_log("[ERR] [DESTRUCTIVE] cleanup_mcp_project_state", COLOR_ERROR, JSON.stringify(result["error"]))
+		return
+
+	var payload: Dictionary = result.get("result", {})
+	var autoload_count := _array_size(payload.get("autoloads_removed", []))
+	var temp_count := _array_size(payload.get("temp_files_removed", []))
+	_add_log(
+		"[OK] [DESTRUCTIVE] cleanup_mcp_project_state removed %d autoload(s), %d temp file(s)" % [autoload_count, temp_count],
+		COLOR_WARNING,
+		JSON.stringify(payload)
+	)
+
+
+func _array_size(value: Variant) -> int:
+	if value is Array:
+		return value.size()
+	return 0
 
 
 func _on_show_details_toggled(on: bool) -> void:

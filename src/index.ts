@@ -43,6 +43,7 @@ async function main(): Promise<void> {
     mode: options.mode,
     bridge,
     runtime,
+    safety: options.safety,
   });
 
   const cleanup = async () => {
@@ -62,7 +63,7 @@ async function main(): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`[SERVER] godot-mcp-mypro running in ${options.mode} mode`);
+  console.error(`[SERVER] godot-mcp-mypro running in ${options.mode} mode, safety=${options.safety}`);
 }
 
 main().catch((error: unknown) => {

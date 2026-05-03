@@ -1,6 +1,7 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import type { GodotToolDefinition, ToolCategory, ToolMode } from './types.js';
+import { TOOL_INPUT_SCHEMAS } from './toolSchemas.js';
 
 const MODE_VALUES = new Set<ToolMode>(['minimal', 'lite', '3d', 'full']);
 
@@ -10,6 +11,31 @@ const GENERIC_OBJECT_SCHEMA: Tool['inputSchema'] = {
   additionalProperties: true,
 };
 
+const TOOL_DESCRIPTIONS: Record<string, string> = {
+  get_project_info: 'Read core Godot project metadata such as project name, path, main scene, viewport, renderer, and autoloads.',
+  create_scene: 'Create a new Godot scene file with a chosen root node type and optional root node name.',
+  open_scene: 'Open an existing Godot scene in the editor.',
+  save_scene: 'Save the currently edited scene, optionally to a new resource path.',
+  add_node: 'Add a node or script class instance to the currently edited scene.',
+  update_property: 'Update one property on a node in the currently edited scene.',
+  get_node_properties: 'Inspect editable properties for a node in the currently edited scene.',
+  create_script: 'Create a GDScript file, either from full content or a generated class template.',
+  edit_script: 'Edit an existing script with full content, search-and-replace, or line insertion.',
+  read_script: 'Read an existing script file and return its content.',
+  validate_script: 'Compile-check a GDScript file and report whether it is valid.',
+  play_scene: 'Run the main scene, current scene, or a specific scene path from the Godot editor.',
+  get_game_node_properties: 'Inspect properties for a node in the running game scene tree.',
+  set_game_node_property: 'Set a property on a node in the running game scene tree.',
+  simulate_key: 'Send a keyboard input event to the running game.',
+  simulate_mouse_click: 'Send a mouse button click to the running game viewport.',
+  simulate_action: 'Send a project Input Map action event to the running game.',
+  set_active_project: '绑定当前 MCP server 的目标 Godot 项目，写入类工具会校验插件连接项目是否一致。',
+  get_active_project: '读取当前绑定的目标 Godot 项目路径。',
+  doctor_connection: '诊断 MCP server、Godot 路径、WebSocket bridge、插件连接和活跃项目状态。',
+  get_mcp_plugin_status: '读取 Godot 插件侧状态，包括项目路径、端口扫描、autoload 和临时资源状态。',
+  cleanup_mcp_project_state: '清理 MCP 插件创建的已知 autoload 和临时状态，保留用户资源。',
+};
+
 const LOCAL_TOOLS: GodotToolDefinition[] = [
   tool('launch_editor', 'local', '启动指定 Godot 项目的编辑器。', true),
   tool('run_project', 'local', '运行指定 Godot 项目并采集调试输出。', true),
@@ -17,6 +43,13 @@ const LOCAL_TOOLS: GodotToolDefinition[] = [
   tool('stop_project', 'local', '停止当前由 server 启动的 Godot 进程。', true),
   tool('get_godot_version', 'local', '读取本机 Godot 可执行文件版本。', true),
   tool('list_projects', 'local', '在目录中查找 Godot project.godot 项目。', true),
+  tool('set_active_project', 'local', '设置当前活跃 Godot 项目。', true),
+  tool('get_active_project', 'local', '读取当前活跃 Godot 项目。', true),
+  tool('doctor_connection', 'local', '诊断 MCP server 与 Godot 插件连接。', true),
+  tool('list_tool_groups', 'local', 'List Godot MCP tool groups and the tools available in each mode.', true),
+  tool('describe_tool', 'local', 'Describe a Godot MCP tool, including category and input parameters.', true),
+  tool('suggest_workflow', 'local', 'Suggest a short sequence of Godot MCP tools for a user goal.', true),
+  tool('get_project_capabilities', 'local', 'Summarize project and mode capabilities exposed by this MCP server.', true),
 ];
 
 const PLUGIN_TOOLS: GodotToolDefinition[] = [
@@ -74,10 +107,12 @@ const PLUGIN_TOOLS: GodotToolDefinition[] = [
     'get_output_log',
     'get_editor_screenshot',
     'get_game_screenshot',
+    'get_mcp_plugin_status',
     'execute_editor_script',
     'clear_output',
     'reload_plugin',
     'reload_project',
+    'cleanup_mcp_project_state',
     'get_signals',
     'compare_screenshots',
     'set_auto_dismiss',
@@ -248,6 +283,9 @@ const MINIMAL_NAMES = new Set([
   'stop_project',
   'get_godot_version',
   'list_projects',
+  'set_active_project',
+  'get_active_project',
+  'doctor_connection',
   'get_project_info',
   'get_filesystem_tree',
   'get_scene_tree',
@@ -274,6 +312,10 @@ const MINIMAL_NAMES = new Set([
   'set_game_node_property',
   'get_input_actions',
   'set_input_action',
+  'list_tool_groups',
+  'describe_tool',
+  'suggest_workflow',
+  'get_project_capabilities',
 ]);
 
 const THREE_D_EXTRA_CATEGORIES = new Set<ToolCategory>([
@@ -332,8 +374,8 @@ function tool(
   return {
     name,
     category,
-    description,
-    inputSchema: GENERIC_OBJECT_SCHEMA,
+    description: TOOL_DESCRIPTIONS[name] ?? description,
+    inputSchema: TOOL_INPUT_SCHEMAS[name] ?? GENERIC_OBJECT_SCHEMA,
     local,
   };
 }

@@ -14,6 +14,17 @@ export interface GodotPluginBridgeOptions {
   requestTimeoutMs?: number;
 }
 
+export class JsonRpcBridgeError extends Error {
+  constructor(
+    message: string,
+    public readonly code: number,
+    public readonly data?: unknown,
+  ) {
+    super(message);
+    this.name = 'JsonRpcBridgeError';
+  }
+}
+
 export class GodotPluginBridge {
   private server?: WebSocketServer;
   private clients = new Set<WebSocket>();
@@ -145,7 +156,11 @@ export class GodotPluginBridge {
     this.pending.delete(response.id);
 
     if (response.error) {
-      pending.reject(new Error(response.error.message));
+      pending.reject(new JsonRpcBridgeError(
+        response.error.message,
+        response.error.code,
+        response.error.data,
+      ));
       return;
     }
 

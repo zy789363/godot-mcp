@@ -31,6 +31,7 @@
     "test": "vitest run",
     "test:godot": "npm run build && node scripts/test-godot.js",
     "test:e2e": "vitest run tests/e2e",
+    "test:project": "node scripts/test-project-tools.js",
     "test:p01": "node scripts/test-p01-tools.js",
     "check": "npm run build && npm test && npm run test:godot",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",

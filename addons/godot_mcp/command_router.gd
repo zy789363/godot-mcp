@@ -16,6 +16,7 @@ func _ready() -> void:
 
 func _register_commands() -> void:
 	var command_classes := [
+		preload("res://addons/godot_mcp/commands/plugin_commands.gd"),
 		preload("res://addons/godot_mcp/commands/project_commands.gd"),
 		preload("res://addons/godot_mcp/commands/scene_commands.gd"),
 		preload("res://addons/godot_mcp/commands/node_commands.gd"),
