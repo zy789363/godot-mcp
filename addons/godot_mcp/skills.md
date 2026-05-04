@@ -1,17 +1,89 @@
 ---
 name: godot-mcp-mypro
-description: Use when controlling Godot 4 projects through the Godot MCP MyPro server and editor plugin from Codex.
+description: Use when developing, inspecting, testing, or debugging Godot projects in Codex, especially when work touches scenes, nodes, scripts, runtime state, screenshots, InputMap, project settings, or headless/dummy rendering errors.
 ---
 
 > **Language:** English | [日本語](skills.ja.md) | [Português (BR)](skills.pt-br.md) | [Español](skills.es.md) | [Русский](skills.ru.md) | [简体中文](skills.zh.md) | [हिन्दी](skills.hi.md)
 
 # Godot MCP MyPro — Skills for AI Assistants
 
-> Default Codex setup: copy this file to `.codex/skills/godot-mcp-mypro/SKILL.md` to give Codex full context on how to use Godot MCP MyPro effectively.
+> Default Codex setup: copy this file to `~/.agents/skills/godot-mcp-mypro/SKILL.md`; also sync it to `~/.codex/skills/godot-mcp-mypro/SKILL.md` for older configurations.
 
 ## What is Godot MCP MyPro?
 
-You have access to 177 MCP tools that connect directly to the Godot 4 editor. You can create scenes, write scripts, simulate player input, inspect running games, and more — all without the user leaving this conversation. Every change goes through Godot's UndoRedo system, so the user can always Ctrl+Z.
+You have access to 186 MCP tools that connect directly to the Godot 4 editor. You can create scenes, write scripts, simulate player input, inspect running games, and more — all without the user leaving this conversation. Every change goes through Godot's UndoRedo system, so the user can always Ctrl+Z.
+
+## Codex Operating Playbook
+
+Use MCP first for Godot editor-visible work. Shell and file edits are fine for ordinary repository chores, but if the result depends on the Godot editor model, scene tree, imported resources, project settings, runtime state, screenshots, or simulated input, route the task through MCP.
+
+### Hard Rules
+
+- Start every Godot task with `doctor_connection {"include_plugin_status": true}`.
+- Set the active project before touching scenes or runtime state. For p01, use `/Users/chenhuan/Desktop/AIGame/p01`.
+- Do not directly edit `.tscn`, `.tres`, `.import`, or `project.godot` when an MCP tool can make the change through Godot.
+- Before claiming runtime, screenshot, or UI success, verify through `play_scene`, runtime inspection, screenshots, logs, or assertions.
+- Do not use Godot `--headless` as evidence for screenshots, visual regression, UI pixel checks, or PNG capture.
+- Stop running scenes with `stop_scene` after tests unless the user wants the editor left running.
+
+### p01 Defaults
+
+- Project path: `/Users/chenhuan/Desktop/AIGame/p01`
+- Project name: `九路连珠 Prototype`
+- Main scene: `res://scenes/ui/prototype_game.tscn`
+- Godot baseline: `/Applications/Godot_mono.app/Contents/MacOS/Godot`
+
+Always confirm these with `get_project_info`; if the active project differs, call `set_active_project` again before continuing.
+
+### Start Sequence
+
+```
+doctor_connection {"include_plugin_status": true}
+set_active_project {"projectPath": "/Users/chenhuan/Desktop/AIGame/p01"}
+get_project_info {}
+```
+
+For scene editing, continue with `open_scene` when needed and `get_scene_tree`. For runtime testing, call `play_scene`, then `get_game_scene_tree`. When something fails, read `get_editor_errors`, `get_output_log`, and `get_mcp_plugin_status`.
+
+If the plugin is not connected, wait briefly and retry. The plugin scans ports `6505-6514`.
+
+### Task To Tool Map
+
+| User intent | MCP route |
+| --- | --- |
+| Understand project | `get_project_info`, `get_filesystem_tree`, `get_scene_tree`, `get_project_settings` |
+| Inspect or change scene | `open_scene`, `get_scene_tree`, `add_node`, `update_property`, `delete_node`, `save_scene` |
+| Create scene | `create_scene`, `add_node`, `attach_script`, `save_scene`, optionally `set_main_scene` |
+| Edit UI/HUD | `add_node`, `update_property`, `set_anchor_preset`, `set_theme_color`, `set_theme_font_size`, `connect_signal`, `save_scene` |
+| Edit scripts | `read_script`, `create_script` or `edit_script`, `validate_script`, `reload_project` when needed |
+| Runtime test | `play_scene`, `get_game_scene_tree`, `get_game_node_properties`, `simulate_action`, `simulate_key`, `simulate_mouse_click`, `assert_node_state`, `stop_scene` |
+| Screenshot or visual QA | Keep a GUI editor open, then `play_scene`, `get_game_screenshot`, `get_editor_screenshot`, `compare_screenshots` |
+| InputMap/settings | `set_input_action`, `set_project_setting`, `add_autoload`, `remove_autoload` |
+| Logs and diagnosis | `get_editor_errors`, `get_output_log`, `doctor_connection`, `get_mcp_plugin_status` |
+| Advanced content | Use full mode for shader, particle, audio, theme, tilemap, 3D, navigation, export, profiling, and Android tools |
+
+Script execution tools in normal safety mode require `confirm: true`.
+
+### Mode Choice
+
+`godot-mcp-mypro` is lite mode, 95 tools, port `6505`, and is the default for daily development. `godot-mcp-mypro-full` is full mode, 186 tools, port `6506`, and is for 3D, shader, particle, audio, theme, tilemap, navigation, profiling, export, Android, and full coverage checks. Start with lite; switch to full when lite lacks the needed tool or when running broad coverage.
+
+### Screenshot And Headless Rules
+
+Do not use Godot `--headless` runs as evidence for screenshots, visual regression, UI pixel checks, or PNG capture. Headless Godot can use a dummy rendering backend, so `get_viewport().get_texture().get_image()` may have no real framebuffer. `get_game_screenshot` can time out, fail to load PNG, or return unusable output.
+
+Use headless only for logic tests, resource loading, script checks, and scene smoke tests. For screenshots, keep a GUI Godot editor open or use a real/virtual display backend, then use MCP `play_scene`, `get_game_screenshot`, `get_editor_screenshot`, or `compare_screenshots`.
+
+If the task reports "headless", "dummy renderer", "Screenshot timed out", "Failed to load screenshot", or no PNG from a screenshot path, treat it as a render-environment problem first. Switch to GUI/virtual display or record screenshot validation as blocked; do not repeatedly retry `--headless`.
+
+### Failure Recovery
+
+- Plugin unavailable: retry `doctor_connection`; ensure the Godot editor is open; call `get_mcp_plugin_status`; reload the plugin when available; check the expected lite/full port.
+- Wrong active project: call `set_active_project`, then confirm `get_project_info.project_path`.
+- Runtime tools timeout: confirm `play_scene` ran first, then inspect `get_game_scene_tree` and logs.
+- Screenshot fails: confirm GUI rendering, not headless/dummy rendering, then capture again.
+- Script changes are not visible: run `validate_script`, then `reload_project`.
+- Project settings drift: use `set_project_setting`; do not directly edit `project.godot`.
 
 ## Essential Workflows
 

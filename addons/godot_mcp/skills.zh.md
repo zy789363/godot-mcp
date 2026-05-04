@@ -1,17 +1,89 @@
 ---
 name: godot-mcp-mypro
-description: 在 Codex 中通过 Godot MCP MyPro server 和编辑器插件操作 Godot 4 项目时使用。
+description: 在 Codex 中通过 Godot MCP MyPro server 和编辑器插件操作 Godot 4 项目，或处理 headless/dummy 渲染截图问题时使用。
 ---
 
 > **Language:** [English](skills.md) | [日本語](skills.ja.md) | [Português (BR)](skills.pt-br.md) | [Español](skills.es.md) | [Русский](skills.ru.md) | 简体中文 | [हिन्दी](skills.hi.md)
 
 # Godot MCP MyPro — AI 助手技能指南
 
-> 默认 Codex 用法：将此文件复制到 `.codex/skills/godot-mcp-mypro/SKILL.md`，以便 Codex 获得如何高效使用 Godot MCP MyPro 的完整上下文。
+> 默认 Codex 用法：将此文件复制到 `~/.agents/skills/godot-mcp-mypro/SKILL.md`；也可以同步到 `~/.codex/skills/godot-mcp-mypro/SKILL.md` 兼容旧配置。
 
 ## 什么是 Godot MCP MyPro？
 
-你可以使用 177 个 MCP 工具直接连接 Godot 4 编辑器。你可以创建场景、编写脚本、模拟玩家输入、检查运行中的游戏等等——所有操作都无需用户离开当前对话。每次更改都通过 Godot 的 UndoRedo 系统进行，因此用户随时可以 Ctrl+Z 撤销。
+你可以使用 186 个 MCP 工具直接连接 Godot 4 编辑器。你可以创建场景、编写脚本、模拟玩家输入、检查运行中的游戏等等——所有操作都无需用户离开当前对话。每次更改都通过 Godot 的 UndoRedo 系统进行，因此用户随时可以 Ctrl+Z 撤销。
+
+## Codex 高频工作手册
+
+Godot 编辑器可见的工作应优先使用 MCP，而不是直接编辑 `.tscn`、`.tres`、`.import` 或 `project.godot`。普通仓库整理、文档、脚本外部自动化可以用 shell；但只要结果依赖 Godot 编辑器模型、场景树、资源导入、项目设置、运行时状态、截图或模拟输入，就应先走 MCP。
+
+### 硬规则
+
+- 每个 Godot 任务先运行 `doctor_connection {"include_plugin_status": true}`。
+- 操作场景或运行时前先设置活动项目；p01 使用 `/Users/chenhuan/Desktop/AIGame/p01`。
+- MCP 可完成时，不直接编辑 `.tscn`、`.tres`、`.import`、`project.godot`。
+- 声称“运行正常”“截图正常”“UI 正常”前，必须用 `play_scene`、运行时检查、截图、日志或断言给出证据。
+- 不用 Godot `--headless` 结果作为截图、视觉回归、UI 像素检查或 PNG 捕获证据。
+- 测试结束后调用 `stop_scene`，除非用户明确希望继续运行。
+
+### p01 默认上下文
+
+- 项目路径：`/Users/chenhuan/Desktop/AIGame/p01`
+- 项目名：`九路连珠 Prototype`
+- 主场景：`res://scenes/ui/prototype_game.tscn`
+- Godot 基线：`/Applications/Godot_mono.app/Contents/MacOS/Godot`
+
+这些值必须通过 `get_project_info` 确认。如果活动项目不一致，先重新调用 `set_active_project`。
+
+### 启动顺序
+
+```
+doctor_connection {"include_plugin_status": true}
+set_active_project {"projectPath": "/Users/chenhuan/Desktop/AIGame/p01"}
+get_project_info {}
+```
+
+场景编辑继续调用 `open_scene`（必要时）和 `get_scene_tree`。运行时测试先调用 `play_scene`，再调用 `get_game_scene_tree`。失败时读取 `get_editor_errors`、`get_output_log`、`get_mcp_plugin_status`。
+
+如果插件未连接，等待片刻后重试。插件会扫描 `6505-6514` 端口。
+
+### 任务到工具映射
+
+| 用户意图 | MCP 调用路线 |
+| --- | --- |
+| 了解项目 | `get_project_info`、`get_filesystem_tree`、`get_scene_tree`、`get_project_settings` |
+| 查看或修改场景 | `open_scene`、`get_scene_tree`、`add_node`、`update_property`、`delete_node`、`save_scene` |
+| 创建场景 | `create_scene`、`add_node`、`attach_script`、`save_scene`、必要时 `set_main_scene` |
+| UI/HUD 调整 | `add_node`、`update_property`、`set_anchor_preset`、`set_theme_color`、`set_theme_font_size`、`connect_signal`、`save_scene` |
+| 脚本修改 | `read_script`、`create_script` 或 `edit_script`、`validate_script`、必要时 `reload_project` |
+| 运行时测试 | `play_scene`、`get_game_scene_tree`、`get_game_node_properties`、`simulate_action`、`simulate_key`、`simulate_mouse_click`、`assert_node_state`、`stop_scene` |
+| 截图和视觉 QA | 保持 GUI 编辑器打开，然后 `play_scene`、`get_game_screenshot`、`get_editor_screenshot`、`compare_screenshots` |
+| InputMap/项目设置 | `set_input_action`、`set_project_setting`、`add_autoload`、`remove_autoload` |
+| 日志诊断 | `get_editor_errors`、`get_output_log`、`doctor_connection`、`get_mcp_plugin_status` |
+| 高级内容 | shader、particle、audio、theme、tilemap、3D、navigation、export、profiling、Android 优先使用 full 模式 |
+
+脚本执行类工具在 normal 安全模式下需要 `confirm: true`。
+
+### 模式选择
+
+`godot-mcp-mypro` 是 lite 模式，95 个工具，端口 `6505`，适合日常开发。`godot-mcp-mypro-full` 是 full 模式，186 个工具，端口 `6506`，适合 3D、shader、particle、audio、theme、tilemap、navigation、profiling、export、Android 和全量巡检。默认先用 lite；lite 缺工具或要做全覆盖时切 full。
+
+### 截图与 Headless 规则
+
+不要把 Godot `--headless` 运行结果当作截图、视觉回归、UI 像素检查或 PNG 捕获证据。Headless 运行可能使用 dummy 渲染后端，`get_viewport().get_texture().get_image()` 没有真实 framebuffer，因此 `get_game_screenshot` 可能超时、无法加载 PNG，或得到不可用输出。
+
+Headless 只用于逻辑测试、资源加载、脚本检查和场景 smoke。需要截图时，保持 GUI Godot 编辑器打开，或使用真实/虚拟显示后端，然后通过 MCP 调用 `play_scene`、`get_game_screenshot`、`get_editor_screenshot`、`compare_screenshots`。
+
+如果任务中出现 "headless"、"dummy renderer"、"Screenshot timed out"、"Failed to load screenshot" 或截图路径没有 PNG，先判定为渲染环境问题，而不是素材或 PNG 编码问题。应切换到 GUI/虚拟显示，或记录截图验证 blocked evidence，不要反复用 `--headless` 重试截图。
+
+### 故障恢复
+
+- 插件不可用：重试 `doctor_connection`；确认 Godot 编辑器已打开；调用 `get_mcp_plugin_status`；必要时 reload 插件；检查 lite/full 端口是否符合预期。
+- 活动项目不对：重新调用 `set_active_project`，再确认 `get_project_info.project_path`。
+- 运行时工具超时：先确认已 `play_scene`，再检查 `get_game_scene_tree` 和日志。
+- 截图失败：先确认不是 headless/dummy 渲染，再重新截图。
+- 脚本修改不可见：先 `validate_script`，再 `reload_project`。
+- 项目设置被覆盖：使用 `set_project_setting`，不要直接改 `project.godot`。
 
 ## 核心工作流
 

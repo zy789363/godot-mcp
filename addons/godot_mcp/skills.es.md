@@ -11,7 +11,7 @@ description: Use when controlling Godot 4 projects through the Godot MCP MyPro s
 
 ## ¿Qué es Godot MCP MyPro?
 
-Tienes acceso a 177 herramientas MCP que se conectan directamente al editor de Godot 4. Puedes crear escenas, escribir scripts, simular entrada del jugador, inspeccionar juegos en ejecución y más — todo sin que el usuario salga de esta conversación. Cada cambio pasa por el sistema UndoRedo de Godot, así que el usuario siempre puede hacer Ctrl+Z.
+Tienes acceso a 186 herramientas MCP que se conectan directamente al editor de Godot 4. Puedes crear escenas, escribir scripts, simular entrada del jugador, inspeccionar juegos en ejecución y más — todo sin que el usuario salga de esta conversación. Cada cambio pasa por el sistema UndoRedo de Godot, así que el usuario siempre puede hacer Ctrl+Z.
 
 ## Flujos de Trabajo Esenciales
 
